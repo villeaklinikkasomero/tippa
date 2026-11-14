@@ -1,6 +1,6 @@
 # Tippa
 
-Tippa on A-klinikkasäätiön prototyyppi: maksuton ja anonyymi mobiiliverkkopalvelu, jolla käyttäjä voi seurata omaa alkoholinkäyttöään ja tukea taukoa tai vähentämistä.
+Tippa on A-klinikkasäätiön prototyyppi: maksuton ja anonyymi mobiiliverkkopalvelu, jolla käyttäjä voi seurata alkoholin ja muiden päihteiden käyttöään ja tukea taukoa tai vähentämistä. Alkoholi ja muut päihteet ovat erillisiä seurantoja, ja käyttäjä valitsee aloituksessa, kumpaa tai molempia hän seuraa.
 
 Palvelu on staattinen sivusto, eli siinä ei ole palvelinta, tietokantaa eikä build-vaihetta. Kaikki käyttäjän tiedot tallentuvat vain hänen omaan selaimeensa (localStorage).
 
@@ -50,6 +50,8 @@ Renderissä: *Settings > Custom Domains*, esimerkiksi `tippa.a-klinikka.fi`. HTT
 - [ ] Poista `index.html`-tiedostosta rivi `<meta name="robots" content="noindex">`, kun palvelu saa näkyä hakukoneissa.
 - [ ] Lisää tietosuojaseloste tai -kuvaus (myös ilman henkilötietoja on hyvä kertoa, ettei tietoja kerätä).
 - [ ] Tarkista AUDIT-C-kysymysten sanamuodot ja riskirajat Päihdelinkin version kanssa.
+- [ ] Muiden päihteiden testi perustuu WHO:n ASSIST-kyselyyn (Päihdelinkin kannabistestin sanamuodot, riskirajat 4 ja 27). ASSISTin suomenkielisen version oikeudet ovat Helsingin kaupungilla: varmista käyttölupa Tippaan. Vaihtoehtoisesti voidaan käyttää DUDITia, jos sen käyttöoikeus on kunnossa.
+- [ ] Tarkista muiden päihteiden haittoja vähentävät viestit (sekakäyttö, opioidit) ja Myrkytystietokeskuksen numero ammattilaisen kanssa.
 - [ ] Lisää Apua-sivulle säätiön omat palvelut (esim. Alkoholilinja) varmistettuine yhteystietoineen.
 - [ ] Saavutettavuustarkistus (digipalvelulaki) ja saavutettavuusseloste.
 - [ ] Ruotsinkielinen versio.
