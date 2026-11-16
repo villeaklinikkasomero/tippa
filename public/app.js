@@ -27,7 +27,7 @@ const BADGES=[
   {id:'dry1',m:'1',t:'Hyvä alku',s:'Ensimmäinen kuiva päivä'},
   {id:'dry7',m:'7',t:'Viikon verran',s:'7 kuivaa päivää'},
   {id:'dry14',m:'14',t:'Kaksi viikkoa',s:'14 kuivaa päivää'},
-  {id:'dry30',m:'30',t:'Kuun mittainen',s:'30 kuivaa päivää'},
+  {id:'dry30',m:'30',t:'Kuun mittainen',s:'30 kuivaa päivää + palkinto'},
   {id:'log7',m:'7×',t:'Ahkera kirjaaja',s:'7 päivää kirjattu'},
   {id:'back',m:'↺',t:'Takaisin raiteille',s:'Kuiva päivä juomapäivän jälkeen'},
   {id:'eur20',m:'20€',t:'Pizzarahat',s:'20 € säästössä'},
@@ -143,6 +143,31 @@ function checkDBadges(){
 }
 
 /* grafiikka */
+const REWARD_SRC='palkinnot/30-paivaa-ilman-alkoholia.webp',REWARD_DL='palkinnot/30-paivaa-ilman-alkoholia.png';
+let rewardFile=null;
+function preloadReward(){if(rewardFile)return;fetch(REWARD_DL).then(r=>r.blob()).then(b=>{const t=b.type||'image/png';rewardFile=new File([b],'tippa-30-paivaa-ilman-alkoholia.'+(t.includes('webp')?'webp':'png'),{type:t})}).catch(()=>{})}
+let dlCap;
+function getDl(){if(dlCap!==undefined)return Promise.resolve(dlCap);if(!(window.claude&&window.claude.use))return Promise.resolve(dlCap=null);return window.claude.use('downloads').then(d=>dlCap=d,()=>dlCap=null)}
+getDl();
+function saveReward(){
+  const hint=()=>toast('Paina kuvaa pitkään ja valitse Tallenna kuva.');
+  if(dlCap&&rewardFile){dlCap.save({filename:rewardFile.name,data:rewardFile}).then(()=>toast('Kuva tallennettu')).catch(e=>{if(!e||e.code!=='declined')hint()});return}
+  try{
+    if(rewardFile&&navigator.canShare&&navigator.canShare({files:[rewardFile]})){navigator.share({files:[rewardFile],title:'30 päivää ilman alkoholia'}).catch(e=>{if(e&&e.name!=='AbortError')hint()});return}
+    if(rewardFile){const u=URL.createObjectURL(rewardFile),a=document.createElement('a');a.href=u;a.download=rewardFile.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return}
+  }catch(e){}
+  hint();
+}
+function rewardSheet(){return '<div class="sheet-bg" data-a="closereward"></div><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rw-h">'+
+  (S.badges.dry30?'<h2 id="rw-h">30 päivää ilman alkoholia!</h2><p class="muted">Ansaitsit palkinnon. Tallenna se itsellesi muistoksi tai jaa se.</p>':'<h2 id="rw-h">Tämä palkinto odottaa</h2><p class="muted">Esikatselu: saat tarran, kun kuivia päiviä on kertynyt 30.</p>')+
+  '<img class="reward-img" src="'+REWARD_SRC+'" alt="Tarra: Ilman alkoholia 30 päivää" width="720" height="720" style="filter:drop-shadow(0 8px 18px rgba(0,0,0,.18))">'+
+  '<button class="btn block" data-a="savereward">Tallenna kuva</button><p class="small muted">Voit myös painaa kuvaa pitkään ja valita Tallenna kuva.</p>'+
+  '<button class="btn ghost" data-a="closereward">Sulje</button></div>'}
+function rewardCard(){const got=!!S.badges.dry30,st=stats();
+  return '<div class="card row reward-card"><img class="reward-thumb'+(got?'':' locked')+'" src="'+REWARD_SRC+'" alt="" width="84" height="84"><div class="stack" style="gap:6px;flex:1;min-width:0"><span class="eyebrow">Palkinto</span><b>30 päivää ilman alkoholia</b>'+
+    (got?'<button class="btn secondary" data-a="openreward">Näytä ja tallenna</button>'
+      :'<span class="small muted">Avautuu, kun kuivia päiviä on 30. Nyt '+Math.min(st.dry,30)+' / 30.</span><div class="bar"><i style="width:'+Math.min(100,st.dry/30*100)+'%"></i></div>'+(S.demo?'<button class="btn ghost" style="align-self:flex-start;padding-left:0" data-a="openreward">Esikatsele palkintoa</button>':''))+
+    '</div></div>'}
 const DROP_PATH='M50 4C50 4 14 46 14 70a36 36 0 0 0 72 0C86 46 50 4 50 4Z';
 function drop(mood,cls){
   const eyes={
@@ -177,7 +202,7 @@ let hapticEl=null;
 function haptic(){try{if(navigator.vibrate){navigator.vibrate(10);return}
   if(!hapticEl){const l=document.createElement('label');l.setAttribute('aria-hidden','true');l.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none';const i=document.createElement('input');i.type='checkbox';i.setAttribute('switch','');i.tabIndex=-1;l.appendChild(i);document.body.appendChild(l);hapticEl=l}
   hapticEl.click()}catch(e){}}
-const HAPTIC=['tab','side','logdry','savedrink','dq','finish','ans','dans','logclean','saveuse','usub','install'];
+const HAPTIC=['savereward','openreward','tab','side','logdry','savedrink','dq','finish','ans','dans','logclean','saveuse','usub','install'];
 const stepper=(act,val,lbl,step)=>'<div class="stepper"><button data-a="'+act+'" data-v="-'+step+'" aria-label="Vähemmän">−</button><output class="num">'+val+'</output><button data-a="'+act+'" data-v="'+step+'" aria-label="Enemmän">+</button></div>'+(lbl?'<p class="small muted" style="text-align:center">'+lbl+'</p>':'');
 const weekStrip=kf=>{const ws=weekStart(today());let h='<div class="week" role="group" aria-label="Valitse päivä">';
   for(let i=0;i<7;i++){const dd=addDays(ws,i),fut=dd>today();
@@ -391,7 +416,7 @@ function renderProgress(){
     '<div class="stat"><div class="v">'+fmt(st.eur)+' €</div><div class="l">säästössä, '+equiv(st.eur)+'</div></div><div class="stat"><div class="v">'+fmt(st.saved)+'</div><div class="l">annosta vähemmän</div></div></div>';
   h+=calendar(d=>kind(S.log[d]),{dry:'Kuiva',drink:'Joi',heavy:'6+ annosta',none:'Ei kirjausta'});
   if(S.goal.type==='vahenna')h+='<div class="card stack"><h3>Annokset viikoittain</h3>'+chart()+'<div class="legend"><span><i style="background:var(--drop)"></i>Annokset</span><span><i style="background:var(--muted)"></i>Lähtötaso</span><span><i style="background:var(--sun)"></i>Tavoite</span></div></div>';
-  h+=badgeGrid(BADGES,S.badges)+situations(S.log);
+  h+=rewardCard()+badgeGrid(BADGES,S.badges)+situations(S.log);
   h+='<p class="small muted">Säästöt verrattuna lähtötasoon ('+S.baseline.perWeek+' annosta viikossa, '+fmt(S.baseline.eur,1)+' € per annos). Lisäksi noin '+fmt(st.kcal)+' kcal vähemmän.</p>';
   return h;
 }
@@ -434,17 +459,34 @@ function renderHelp(){
     {h:'Juttele ammattilaisen kanssa',p:'Tilanteesta kannattaa keskustella ammattilaisen kanssa. Se ei sido sinua hoitoon. Lyhytkin keskustelu auttaa löytämään sopivan tuen.'}][tier];
   let h='<h1 style="font-size:1.8rem;margin-top:8px">Apua</h1>';
   h+='<div class="mascot"><div class="drop" style="width:64px">'+drop('calm')+'</div><div class="bubble" style="margin-bottom:12px"><b>'+rec.h+'</b>'+rec.p+(why.length?'<div class="small muted" style="margin-top:6px">Perusteena '+why.join(', ')+'.</div>':'')+'</div></div>';
-  const items=[
-    {t:'Päihdelinkki',d:'Tietoa, testejä ja palveluhaku omalta alueeltasi.',u:'https://paihdelinkki.fi',show:true},
-    {t:'Mielenterveystalo',d:'Maksuttomia, anonyymejä omahoito-ohjelmia.',u:'https://www.mielenterveystalo.fi',show:tier>=1},
-    {t:'Työterveys tai terveysasema',d:'Päihteiden käytön voi ottaa puheeksi tavallisella vastaanotolla.',show:tier>=1},
-    {t:'Terveysneuvontapisteet',d:'Haittoja vähentävää neuvontaa ja välineitä ilman nimeä. Löydät lähimmän Päihdelinkin palveluhausta.',show:S.track.drugs},
-    {t:'Myrkytystietokeskus',d:'Neuvoa myrkytyksiin ja yliannostuksiin ympäri vuorokauden.',ph:'0800 147 111',show:S.track.drugs},
-    {t:'Päivystysapu',d:'Neuvoa kiireelliseen tilanteeseen, esimerkiksi vieroitusoireisiin.',ph:'116 117',show:true},
-    {t:'Hätänumero',d:'Kun henki tai terveys on välittömässä vaarassa, esimerkiksi jos joku ei herää.',ph:'112',show:true}].filter(x=>x.show);
-  h+='<div class="card">'+items.map(x=>'<div class="help"><b>'+x.t+'</b><span class="small muted">'+x.d+'</span>'+(x.ph?'<span class="phone num">'+x.ph+'</span>':'')+(x.u?'<a href="'+x.u+'" target="_blank" rel="noopener">Avaa ↗</a>':'')+'</div>').join('')+'</div>';
+  const T=S.track;
+  const groups=[
+    {h:'Juttele nyt',items:[
+      {t:'Päihdelinkki-chat',d:'Keskustele nimettömästi ammattilaisen kanssa omasta tai läheisen tilanteesta. Ma–ti klo 15–17, ke–to klo 13–15.',u:'https://paihdelinkki.fi/mista-apua/paihdelinkki-chat/'},
+      {t:'Päihdeneuvonta (EHYT ry)',d:'Maksuton ja nimetön puhelin, auki ympäri vuorokauden.',ph:'0800 900 45'},
+      T.drugs&&{t:'Irti huumeista ry',d:'Neuvontaa huumeista ja tukea myös läheisille.',ph:'0800 980 66',u:'https://irtihuumeista.fi/'}]},
+    {h:'Kirjoita ja lue',items:[
+      {t:'Päihdelinkin neuvontapalvelu',d:'Kirjoita kysymys milloin vain. Saat henkilökohtaisen vastauksen noin 3–4 päivässä.',u:'https://paihdelinkki.fi/neuvonta/'},
+      {t:'Päihdelinkin keskustelufoorumi',d:'Vertaistukea muilta, jotka miettivät samoja asioita.',u:'https://keskustelu.paihdelinkki.fi/'},
+      {t:'Päihdelinkki',d:'Tietoa, testejä ja palveluhaku omalta alueeltasi.',u:'https://paihdelinkki.fi/'},
+      tier>=1&&{t:'Mielenterveystalo',d:'Maksuttomia, anonyymejä omahoito-ohjelmia.',u:'https://www.mielenterveystalo.fi/'}]},
+    {h:'Vertaistuki',items:[
+      T.alcohol&&{t:'AA, Nimettömät Alkoholistit',d:'Vertaistukiryhmiä eri puolilla Suomea.',ph:'09 750 200',u:'https://www.aa.fi/'},
+      T.drugs&&{t:'NA, Nimettömät Narkomaanit',d:'Vertaistukiryhmiä. Auttava puhelin klo 18–20.',ph:'050 370 7597',u:'https://www.nasuomi.org/'},
+      {t:'Al-Anon',d:'Tukea alkoholistien läheisille.',u:'https://www.al-anon.fi/'}]},
+    {h:'Ammattilainen',items:[
+      tier>=1&&{t:'Työterveys tai terveysasema',d:'Päihteiden käytön voi ottaa puheeksi tavallisella vastaanotolla.'},
+      T.drugs&&{t:'Terveysneuvontapisteet',d:'Haittoja vähentävää neuvontaa ja välineitä ilman nimeä. Löydät lähimmän Päihdelinkin palveluhausta.'}]},
+    {h:'Kiireellinen apu',items:[
+      T.drugs&&{t:'Myrkytystietokeskus',d:'Neuvoa myrkytyksiin ja yliannostuksiin ympäri vuorokauden.',ph:'0800 147 111'},
+      {t:'Päivystysapu',d:'Neuvoa kiireelliseen tilanteeseen, esimerkiksi vieroitusoireisiin.',ph:'116 117'},
+      {t:'Hätänumero',d:'Kun henki tai terveys on välittömässä vaarassa, esimerkiksi jos joku ei herää.',ph:'112'}]}
+  ];
+  const tel=n=>'tel:'+n.replace(/\s/g,'');
+  const item=x=>'<div class="help"><b>'+x.t+'</b><span class="small muted">'+x.d+'</span>'+(x.ph?'<a class="phone num" href="'+tel(x.ph)+'">'+x.ph+'</a>':'')+(x.u?'<a href="'+x.u+'" target="_blank" rel="noopener noreferrer">Avaa uuteen ikkunaan ↗</a>':'')+'</div>';
+  groups.forEach(g=>{const its=g.items.filter(Boolean);if(its.length)h+='<div class="stack" style="gap:8px"><span class="eyebrow">'+g.h+'</span><div class="card">'+its.map(item).join('')+'</div></div>'});
   h+='<button class="btn secondary block" data-a="retest">Tee testit uudelleen</button>';
-  h+='<p class="small muted">Prototyypissä suositus määräytyy testien ja kirjausten mukaan. Tuotannossa linkkien avaukset mitattaisiin anonyymisti.</p>';
+  h+='<p class="small muted">Linkit avautuvat uuteen ikkunaan. Tippa ei tallenna eikä välitä tietoa siitä, mitä avaat tai kenelle soitat. Kohdesivustoilla on omat tietosuojakäytäntönsä.</p>';
   return h;
 }
 
@@ -502,15 +544,26 @@ function render(){
     fixSide();const dr=ui.side==='drugs';
     const body=ui.tab==='today'?(dr?renderTodayD():renderToday()):ui.tab==='progress'?'<h1 style="font-size:1.8rem;margin-top:8px">Kertynyt</h1>'+(dr?renderProgressD():renderProgress()):ui.tab==='help'?renderHelp():renderSettings();
     h=topbar()+'<div class="stack-lg">'+((ui.tab==='today'||ui.tab==='progress')?sideSwitch():'')+body+'</div>'+
-      '<nav class="tabs" aria-label="Päävalikko"><div class="in">'+[['today','Tänään','today'],['progress','Kertynyt','prog'],['help','Apua','help'],['settings','Asetukset','set']].map(t=>'<button class="'+(ui.tab===t[0]?'on':'')+'" data-a="tab" data-v="'+t[0]+'"'+(ui.tab===t[0]?' aria-current="page"':'')+'>'+NAV[t[2]]+t[1]+'</button>').join('')+'</div></nav>';
+      (ui.reward?rewardSheet():'')+'<nav class="tabs" aria-label="Päävalikko"><div class="in">'+[['today','Tänään','today'],['progress','Kertynyt','prog'],['help','Apua','help'],['settings','Asetukset','set']].map(t=>'<button class="'+(ui.tab===t[0]?'on':'')+'" data-a="tab" data-v="'+t[0]+'"'+(ui.tab===t[0]?' aria-current="page"':'')+'>'+NAV[t[2]]+t[1]+'</button>').join('')+'</div></nav>';
   }
   $('#app').innerHTML=h;
 }
 function badgeToast(list,ids){if(!ids.length)return;const b=list.find(x=>x.id===ids[ids.length-1]);setTimeout(()=>toast('<span class="b">'+b.m+'</span><span>Uusi merkki: '+b.t+'</span>'),500)}
-function afterSave(d){askPersist();ui.feedback=feedbackFor(d);badgeToast(BADGES,checkBadges())}
+function afterSave(d){askPersist();ui.feedback=feedbackFor(d);const nb=checkBadges();if(nb.includes('dry30')){preloadReward();ui.reward=true;nb.splice(nb.indexOf('dry30'),1)}badgeToast(BADGES,nb)}
 function afterSaveD(d){askPersist();ui.feedback=feedbackForD(d);badgeToast(DBADGES,checkDBadges())}
 const toggle=(arr,v)=>{const i=arr.indexOf(v);i<0?arr.push(v):arr.splice(i,1)};
 function finishOnboarding(){const t=today();if(!S._retest){S.goal.start=t;S.d.goal.start=t}S.onboarded=true;ui.tab=S._retest?'help':'today';delete S._retest;fixSide()}
+/* Kaksoisnapautuszoomauksen esto (iOS Safari): toinen nopea napautus ei zoomaa, vaan toimii tavallisena painalluksena */
+let lastTap=0,tapX=0,tapY=0;
+document.addEventListener('touchstart',e=>{if(e.touches.length===1){tapX=e.touches[0].clientX;tapY=e.touches[0].clientY}},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(e.touches.length||e.changedTouches.length!==1)return;
+  const t=e.changedTouches[0];if(Math.abs(t.clientX-tapX)>10||Math.abs(t.clientY-tapY)>10){lastTap=0;return}
+  if(e.target.closest('input,textarea,select'))return;
+  const now=Date.now();
+  if(now-lastTap<400){e.preventDefault();lastTap=0;const el=e.target.closest('[data-a],a[href]');if(el&&!el.disabled)el.click();return}
+  lastTap=now;
+},{passive:false});
 document.addEventListener('input',e=>{if(e.target.id==='restore-in')ui.restore=e.target.value});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest('[data-a]');if(!el)return;const a=el.dataset.a,v=el.dataset.v;
@@ -551,6 +604,9 @@ document.addEventListener('click',ev=>{
     case 'usub':toggle(ui.draft.subs,v);break;
     case 'saveuse':S.d.log[ui.day]={clean:false,subs:ui.draft.subs,tags:ui.draft.tags};ui.draft=null;ui.editing=false;afterSaveD(ui.day);break;
     case 'canceldraft':ui.draft=null;break;
+    case 'openreward':preloadReward();ui.reward=true;break;
+    case 'closereward':ui.reward=false;break;
+    case 'savereward':saveReward();return;
     case 'edit':ui.editing=true;ui.draft=null;ui.feedback=null;break;
     case 'retest':S.onboarded=false;S._retest=true;S._bInit=S._gInit=S._dbInit=S._dgInit=true;Object.values(S.d.assist).forEach(x=>delete x.skipped);S.step=2;break;
     case 'strack':{const o=v==='alcohol'?'drugs':'alcohol';if(S.track[v]&&!S.track[o])break;S.track[v]=!S.track[v];if(v==='drugs'&&S.track.drugs&&!S.d.subs.length)S.d.subs.push('kannabis');break}
