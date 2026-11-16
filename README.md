@@ -43,7 +43,8 @@ Renderissä: *Settings > Custom Domains*, esimerkiksi `tippa.a-klinikka.fi`. HTT
 - Ei rekisteröitymistä, evästeitä, analytiikkaa eikä kolmansien osapuolten palveluita. Fontit ladataan omalta palvelimelta, ei Googlelta.
 - Content Security Policy estää ulkoiset skriptit ja yhteydet. Sovellus ei lähetä mitään minnekään.
 - Palvelu pyytää selaimelta pysyvää tallennustilaa ja kehottaa lisäämään sovelluksen kotinäytölle. Tämä vähentää riskiä, että selain (etenkin iPhonen Safari) poistaa tiedot.
-- Käyttäjä voi ottaa varmuuskopion koodina ja palauttaa sen Asetuksista.
+- Käyttäjä tallentaa varmuuskopion tiedostona (puhelimessa jakovalikon kautta esim. Tiedostoihin tai iCloud Driveen) ja palauttaa sen Asetuksista. Tipan Tänään-näkymä muistuttaa varmuuskopiosta, kun kirjauksia on vähintään 14 ja edellisestä varmuuskopiosta on yli kuukausi. Vanha kopioitava varmuuskopiokoodi on yhä käytettävissä.
+- Varmuuskopiotiedosto on salaamaton tekstitiedosto. Jos tiedostoon halutaan salaus, se kannattaa toteuttaa samalla kun salattu synkronointi tehdään palvelinympäristöön.
 
 ## Ennen julkista käyttöä
 

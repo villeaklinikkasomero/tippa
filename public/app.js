@@ -149,6 +149,15 @@ function preloadReward(){if(rewardFile)return;fetch(REWARD_DL).then(r=>r.blob())
 let dlCap;
 function getDl(){if(dlCap!==undefined)return Promise.resolve(dlCap);if(!(window.claude&&window.claude.use))return Promise.resolve(dlCap=null);return window.claude.use('downloads').then(d=>dlCap=d,()=>dlCap=null)}
 getDl();
+function backupFile(){return new File([JSON.stringify(S)],'tippa-varmuuskopio-'+today()+'.txt',{type:'text/plain'})}
+function fileDownload(f){const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+function saveBackup(){
+  const f=backupFile(),done=()=>{S.lastBackup=today();delete S.backupSnooze;save();render();toast('Varmuuskopio tallennettu')};
+  if(dlCap){dlCap.save({filename:f.name,data:f}).then(done).catch(e=>{if(!e||e.code!=='declined')toast('Tallennus ei onnistunut tässä näkymässä. Käytä varmuuskopiokoodia.')});return}
+  try{if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:'Tippa: varmuuskopio'}).then(done).catch(e=>{if(e&&e.name!=='AbortError'){fileDownload(f);done()}});return}}catch(e){}
+  fileDownload(f);done();
+}
+function parseBackup(text){text=String(text).trim();let o;try{o=JSON.parse(text)}catch(e){o=JSON.parse(decodeURIComponent(escape(atob(text))))}return migrate(o)}
 function saveReward(){
   const hint=()=>toast('Paina kuvaa pitkään ja valitse Tallenna kuva.');
   if(dlCap&&rewardFile){dlCap.save({filename:rewardFile.name,data:rewardFile}).then(()=>toast('Kuva tallennettu')).catch(e=>{if(!e||e.code!=='declined')hint()});return}
@@ -170,6 +179,7 @@ function rewardCard(){const got=!!S.badges.dry30,st=stats();
     '</div></div>'}
 const DROP_PATH='M50 4C50 4 14 46 14 70a36 36 0 0 0 72 0C86 46 50 4 50 4Z';
 function drop(mood,cls){
+  if(mood==='plain')return '<svg viewBox="0 0 100 110" class="'+(cls||'')+'" aria-hidden="true"><path class="drop-c" d="'+DROP_PATH+'"/><ellipse class="drop-hl" cx="34" cy="52" rx="6" ry="10" transform="rotate(25 34 52)"/></svg>';
   const eyes={
     happy:'<circle class="drop-eye" cx="38" cy="66" r="4.5"/><circle class="drop-eye" cx="62" cy="66" r="4.5"/>',
     cheer:'<path class="drop-mouth" d="M32 66q6-7 12 0M56 66q6-7 12 0"/>',
@@ -193,7 +203,8 @@ const NAV={
 const $=s=>document.querySelector(s);
 let toastTimer;
 function toast(html){const t=$('#toast');t.innerHTML='<div class="toast" role="status">'+html+'</div>';t.hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.hidden=true},3800)}
-const topbar=()=>'<div class="top"><div class="logo"><svg viewBox="0 0 100 110" aria-hidden="true"><path class="drop-c" d="'+DROP_PATH+'"/></svg>Tippa</div><div class="row">'+(S.demo?'<span class="chip sun">Esimerkki</span>':'')+'<span class="chip">Prototyyppi</span></div></div>';
+const LOCKUP='<img class="lockup lk-light" src="brand/lockup-musta.svg" alt="A-klinikkasäätiö" width="163" height="30"><img class="lockup lk-dark" src="brand/lockup-valkoinen.svg" alt="A-klinikkasäätiö" width="163" height="30">';
+const topbar=()=>'<div class="top"><div class="logo"><svg viewBox="0 0 100 110" aria-hidden="true"><path class="drop-c" d="'+DROP_PATH+'"/></svg>Tippa</div>'+LOCKUP+'</div><div class="row" style="gap:6px;margin-bottom:10px">'+(S.demo?'<span class="chip sun">Esimerkki</span>':'')+'<span class="chip">Prototyyppi</span></div>';
 const sideSwitch=()=>both()?'<div class="seg" role="tablist" aria-label="Valitse seuranta"><button role="tab" aria-selected="'+(ui.side==='alcohol')+'" class="'+(ui.side==='alcohol'?'on':'')+'" data-a="side" data-v="alcohol">Alkoholi</button><button role="tab" aria-selected="'+(ui.side==='drugs')+'" class="'+(ui.side==='drugs'?'on':'')+'" data-a="side" data-v="drugs">Muut päihteet</button></div>':'';
 const back=()=>'<button class="btn ghost" data-a="prev">← Takaisin</button>';
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -202,13 +213,13 @@ let hapticEl=null;
 function haptic(){try{if(navigator.vibrate){navigator.vibrate(10);return}
   if(!hapticEl){const l=document.createElement('label');l.setAttribute('aria-hidden','true');l.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none';const i=document.createElement('input');i.type='checkbox';i.setAttribute('switch','');i.tabIndex=-1;l.appendChild(i);document.body.appendChild(l);hapticEl=l}
   hapticEl.click()}catch(e){}}
-const HAPTIC=['savereward','openreward','tab','side','logdry','savedrink','dq','finish','ans','dans','logclean','saveuse','usub','install'];
+const HAPTIC=['savebackup','savereward','openreward','tab','side','logdry','savedrink','dq','finish','ans','dans','logclean','saveuse','usub','install'];
 const stepper=(act,val,lbl,step)=>'<div class="stepper"><button data-a="'+act+'" data-v="-'+step+'" aria-label="Vähemmän">−</button><output class="num">'+val+'</output><button data-a="'+act+'" data-v="'+step+'" aria-label="Enemmän">+</button></div>'+(lbl?'<p class="small muted" style="text-align:center">'+lbl+'</p>':'');
 const weekStrip=kf=>{const ws=weekStart(today());let h='<div class="week" role="group" aria-label="Valitse päivä">';
   for(let i=0;i<7;i++){const dd=addDays(ws,i),fut=dd>today();
     h+='<button class="day'+(dd===ui.day?' sel':'')+'" data-a="day" data-v="'+dd+'"'+(fut?' disabled':'')+' aria-label="'+longDate(dd)+'"><span class="dn">'+DN[i]+'</span><span class="dd">'+parse(dd).getDate()+'</span>'+miniDrop(kf(dd))+'</button>'}
   return h+'</div>'};
-const mascotBox=(g,anim)=>'<div class="mascot-wrap"><div class="mascot"><div class="drop">'+drop(g.mood,anim)+'</div><div class="bubble'+(g.warm?' warm':'')+'" role="status"><b>'+g.h+'</b>'+g.t+'</div></div>'+
+const mascotBox=(g,anim)=>'<div class="mascot-wrap"><div class="mascot"><div class="drop">'+drop(g.milestone?'cheer':'plain',anim)+'</div><div class="bubble'+(g.milestone?' mile':g.warm?' warm':'')+'" role="status"><b>'+g.h+'</b>'+g.t+'</div></div>'+
   (anim==='jump'?'<div class="splash" aria-hidden="true">'+[[-30,-30],[30,-34],[-40,4],[42,0],[0,-46]].map(p=>'<i style="--dx:'+p[0]+'px;--dy:'+p[1]+'px"></i>').join('')+'</div>':'')+'</div>';
 const badgeGrid=(list,got)=>{const n=list.filter(b=>got[b.id]).length;return '<div class="stack"><div class="row between"><h3>Merkit</h3><span class="muted small num">'+n+' / '+list.length+'</span></div><div class="badges">'+list.map(b=>'<div class="badge'+(got[b.id]?' got':'')+'"><div class="b'+(b.m.length>3?' long':'')+'">'+b.m+'</div><div class="t">'+b.t+'</div><div class="s">'+b.s+'</div></div>').join('')+'</div></div>'};
 const situations=log=>{const cnt={};Object.values(log).forEach(e=>(e.tags||[]).forEach(t=>cnt[t]=(cnt[t]||0)+1));const tops=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,3);
@@ -237,11 +248,11 @@ function renderOnboarding(){
   const L=steps(),st=L[S.step]||L[0];let h=topbar();
   if(st.k!=='welcome')h+='<div class="progress" aria-hidden="true"><i style="width:'+Math.round(S.step/(L.length-1)*100)+'%"></i></div>';
   if(st.k==='welcome'){
-    h+='<div class="stack-lg center" style="padding-top:20px"><div class="big-drop">'+drop('happy','bob')+'</div>'+
+    h+='<div class="stack-lg center" style="padding-top:20px"><div class="big-drop">'+drop('plain','bob')+'</div>'+
       '<div class="stack center"><h1>Moi, olen Tippa!</h1><p class="muted" style="max-width:32ch">Autan sinua pitämään kirjaa alkoholin ja muiden päihteiden käytöstä. Tauko vai vähentäminen, sinä päätät.</p></div>'+
       '<div class="row" style="justify-content:center;gap:8px"><span class="chip">Maksuton</span><span class="chip">Anonyymi</span><span class="chip">Tiedot vain sinulla</span></div>'+
       '<div class="stack" style="width:100%"><button class="btn block" data-a="next">Aloitetaan</button><button class="btn secondary block" data-a="demo">Kurkista esimerkkiin</button></div>'+
-      '<p class="small muted">A-klinikkasäätiön prototyyppi. Ei korvaa ammattilaisen arviota.</p></div>';
+      '<p class="small muted">Tippa on A-klinikkasäätiön palvelun prototyyppi. Se ei korvaa ammattilaisen arviota.</p></div>';
   }else if(st.k==='choose'){
     const t=S.track,ok=(t.alcohol||t.drugs)&&(!t.drugs||S.d.subs.length);
     h+='<div class="stack-lg"><div class="stack"><span class="eyebrow">Aluksi</span><h2>Mitä haluat seurata?</h2><p class="small muted">Voit valita molemmat. Ne pidetään sovelluksessa erillään, ja voit muuttaa valintaa myöhemmin.</p></div><div class="stack">'+
@@ -262,7 +273,7 @@ function renderOnboarding(){
     const txt=['Juomisesi on matalan riskin tasolla. Seuranta auttaa pitämään sen siellä.',
       'Juomisesi on riskitasolla. Hyvä uutinen: pienikin vähennys pienentää riskiä, ja moni onnistuu omin keinoin.',
       'Juomisesi on selvästi riskitasolla. Seuranta on hyvä alku, ja ammattilaisen kanssa kannattaa myös jutella. Apua-sivulta löydät vaihtoehtoja.'][lv];
-    h+='<div class="stack-lg center"><div class="big-drop" style="width:110px">'+drop(lv===0?'happy':lv===1?'calm':'care','bob')+'</div>'+
+    h+='<div class="stack-lg center"><div class="big-drop" style="width:110px">'+drop('plain','bob')+'</div>'+
       '<div class="stack center"><span class="eyebrow">Alkoholi</span><span class="level l'+lv+'">'+LEVELS[lv]+'</span><h2>'+sc+' / 12 pistettä</h2><p style="max-width:34ch">'+txt+'</p></div>'+
       '<p class="small muted" style="max-width:36ch">Testi on AUDIT-C. Se antaa suuntaa, mutta ei ole diagnoosi. Riskiraja sinulle: '+threshold()+' pistettä.</p>'+nextBtn()+back()+'</div>';
   }else if(st.k==='dq'){
@@ -276,7 +287,7 @@ function renderOnboarding(){
       0:'Käyttösi on testin perusteella matalan riskin tasolla. Seuranta auttaa huomaamaan, jos tilanne muuttuu.',
       1:'Käyttöösi liittyy kohtalainen riski haitoille. Jo pienet muutokset vähentävät haittoja, ja tukea on saatavilla.',
       2:'Käyttöösi liittyy suuri riski haitoille ja riippuvuudelle. Ammattilaisen kanssa kannattaa jutella. Apua-sivulta löydät vaihtoehtoja.'}[lv];
-    h+='<div class="stack-lg center"><div class="big-drop" style="width:110px">'+drop(lv<=0?'happy':lv===1?'calm':'care','bob')+'</div>'+
+    h+='<div class="stack-lg center"><div class="big-drop" style="width:110px">'+drop('plain','bob')+'</div>'+
       '<div class="stack center"><span class="eyebrow">Muut päihteet</span><p style="max-width:34ch">'+txt+'</p></div>'+
       '<div class="card stack" style="width:100%;text-align:left">'+S.d.subs.map(id=>{const sc=assistScore(id),l=assistLevel(sc);return '<div class="row between"><b>'+sub(id).n+'</b>'+(l==null?'<span class="chip">Ohitettu</span>':'<span class="row" style="gap:8px"><span class="small muted num">'+sc+' p</span><span class="level l'+l+'">'+LEVELS[l]+'</span></span>')+'</div>'}).join('')+'</div>'+
       '<p class="small muted" style="max-width:36ch">Testi perustuu WHO:n ASSIST-kyselyyn. Riskirajat ovat 4 ja 27 pistettä. Tulos antaa suuntaa, mutta ei ole diagnoosi.</p>'+nextBtn()+back()+'</div>';
@@ -332,12 +343,19 @@ function feedbackFor(d){
   if(a>=6)return {d,side:'alcohol',mood:'care',warm:true,h:'Kiitos, että kirjasit',t:t+' Kuusi annosta tai enemmän kerralla lisää tapaturmien riskiä. Jos tällaisia kertoja on usein, Apua-sivulla on vaihtoehtoja.'};
   return {d,side:'alcohol',mood:'calm',warm:true,h:'Kirjattu',t};
 }
+function backupNudge(){
+  const n=new Set(Object.keys(S.log).concat(Object.keys(S.d.log))).size;
+  if(n<14)return '';
+  if(S.lastBackup&&diffDays(S.lastBackup,today())<30)return '';
+  if(S.backupSnooze&&diffDays(S.backupSnooze,today())<14)return '';
+  return '<div class="card stack" style="gap:10px"><h3>Tallenna varmuuskopio</h3><p class="small muted">'+(S.lastBackup?'Edellisestä varmuuskopiosta on yli kuukausi.':'Sinulla on jo '+n+' kirjattua päivää.')+' Tallenna ne talteen, jos vaihdat puhelinta tai selain tyhjentää tiedot.</p><div class="row"><button class="btn" style="flex:1" data-a="savebackup">Tallenna</button><button class="btn ghost" data-a="snoozebackup">Myöhemmin</button></div></div>';
+}
 function renderToday(){
   const d=ui.day,e=S.log[d],g=greeting(),anim=ui.anim==='jump'?'jump':'bob';ui.anim=null;
   let h=mascotBox(g,anim)+weekStrip(dd=>kind(S.log[dd]));
   if(!e||ui.editing){
     const dr=ui.draft;
-    if(!dr)h+='<div class="choice"><button class="btn water" data-a="logdry">Ei tippaakaan<small>kuiva päivä</small></button><button class="btn secondary" data-a="startdrink">Join<small>kirjaa annokset</small></button></div>';
+    if(!dr)h+='<div class="choice"><button class="btn water" data-a="logdry">Ei tippaakaan<small>kuiva päivä</small></button><button class="btn secondary" data-a="startdrink">'+(d===today()?'Join tänään':'Join '+WD[parse(d).getDay()]+'na')+'<small>kirjaa annokset</small></button></div>';
     else{
       const a=DRINKS.reduce((s,x)=>s+(dr.drinks[x.id]||0)*x.a,0);
       h+='<div class="card stack"><div class="row between"><h3>Mitä joit?</h3><span class="small muted">Napauta lisätäksesi</span></div><div class="tiles">'+
@@ -347,7 +365,7 @@ function renderToday(){
       h+='<div class="row"><button class="btn" style="flex:1" data-a="savedrink"'+(a>0?'':' disabled')+'>Tallenna</button><button class="btn secondary" data-a="canceldraft">Peru</button></div></div>';
     }
   }else h+='<div class="card row between"><div class="row">'+miniDrop(kind(e),'width:22px;height:24px')+'<div><b>'+(e.dry?'Kuiva päivä':fmt(annos(e),1)+' annosta')+'</b>'+(e.tags&&e.tags.length?'<div class="small muted">'+e.tags.join(', ')+'</div>':'')+'</div></div><button class="btn ghost" data-a="edit">Muuta</button></div>';
-  return h+goalCard();
+  return h+goalCard()+backupNudge();
 }
 function goalCard(){
   const g=S.goal;let h='<div class="card stack" style="gap:10px">';
@@ -392,7 +410,7 @@ function renderTodayD(){
       h+='<div class="row"><button class="btn" style="flex:1" data-a="saveuse"'+(dr.subs.length?'':' disabled')+'>Tallenna</button><button class="btn secondary" data-a="canceldraft">Peru</button></div></div>';
     }
   }else h+='<div class="card row between"><div class="row">'+miniDrop(dkind(d),'width:22px;height:24px')+'<div><b>'+(e.clean?'Selvä päivä':e.subs.map(id=>sub(id).n).join(', '))+'</b>'+(e.tags&&e.tags.length?'<div class="small muted">'+e.tags.join(', ')+'</div>':'')+'</div></div><button class="btn ghost" data-a="edit">Muuta</button></div>';
-  return h+goalCardD();
+  return h+goalCardD()+backupNudge();
 }
 function goalCardD(){
   const g=S.d.goal;let h='<div class="card stack" style="gap:10px">';
@@ -412,18 +430,18 @@ function calendar(kf,labels){
 }
 function renderProgress(){
   const st=stats();
-  let h='<div class="stats"><div class="stat wide">'+drop('cheer')+'<div><div class="v">'+st.dry+'</div><div class="l">kuivaa päivää</div></div></div>'+
-    '<div class="stat"><div class="v">'+fmt(st.eur)+' €</div><div class="l">säästössä, '+equiv(st.eur)+'</div></div><div class="stat"><div class="v">'+fmt(st.saved)+'</div><div class="l">annosta vähemmän</div></div></div>';
+  let h='<div class="stats"><div class="stat wide">'+drop('plain')+'<div><div class="v">'+st.dry+'</div><div class="l">kuivaa päivää</div></div></div>'+
+    '<div class="stat sun"><div class="v">'+fmt(st.eur)+' €</div><div class="l">säästössä, '+equiv(st.eur)+'</div></div><div class="stat"><div class="v">'+fmt(st.saved)+'</div><div class="l">annosta vähemmän</div></div></div>';
   h+=calendar(d=>kind(S.log[d]),{dry:'Kuiva',drink:'Joi',heavy:'6+ annosta',none:'Ei kirjausta'});
-  if(S.goal.type==='vahenna')h+='<div class="card stack"><h3>Annokset viikoittain</h3>'+chart()+'<div class="legend"><span><i style="background:var(--drop)"></i>Annokset</span><span><i style="background:var(--muted)"></i>Lähtötaso</span><span><i style="background:var(--sun)"></i>Tavoite</span></div></div>';
+  if(S.goal.type==='vahenna')h+='<div class="card stack"><h3>Annokset viikoittain</h3>'+chart()+'<div class="legend"><span><i style="background:var(--drop)"></i>Annokset</span><span><i style="background:var(--muted)"></i>Lähtötaso</span><span><i style="background:var(--ink)"></i>Tavoite</span></div></div>';
   h+=rewardCard()+badgeGrid(BADGES,S.badges)+situations(S.log);
   h+='<p class="small muted">Säästöt verrattuna lähtötasoon ('+S.baseline.perWeek+' annosta viikossa, '+fmt(S.baseline.eur,1)+' € per annos). Lisäksi noin '+fmt(st.kcal)+' kcal vähemmän.</p>';
   return h;
 }
 function renderProgressD(){
   const st=dstats(),showEur=S.d.baseline.eur>0;
-  let h='<div class="stats"><div class="stat wide">'+drop('cheer')+'<div><div class="v">'+st.clean+'</div><div class="l">selvää päivää</div></div></div>'+
-    (showEur?'<div class="stat"><div class="v">'+fmt(st.eur)+' €</div><div class="l">säästössä, '+equiv(st.eur)+'</div></div>':'')+
+  let h='<div class="stats"><div class="stat wide">'+drop('plain')+'<div><div class="v">'+st.clean+'</div><div class="l">selvää päivää</div></div></div>'+
+    (showEur?'<div class="stat sun"><div class="v">'+fmt(st.eur)+' €</div><div class="l">säästössä, '+equiv(st.eur)+'</div></div>':'')+
     '<div class="stat"'+(showEur?'':' style="grid-column:1/-1"')+'><div class="v">'+fmt(st.saved)+'</div><div class="l">käyttöpäivää vähemmän</div></div></div>';
   h+=calendar(dkind,{dry:'Selvä',drink:'Käytti',heavy:'Sekakäyttö',none:'Ei kirjausta'});
   h+=badgeGrid(DBADGES,S.d.badges)+situations(S.d.log);
@@ -439,7 +457,7 @@ function chart(){
   for(let v=0;v<=top;v+=step)s+='<line x1="'+pl+'" x2="'+W+'" y1="'+y(v)+'" y2="'+y(v)+'" stroke="var(--line)"/><text x="'+(pl-6)+'" y="'+(y(v)+3)+'" text-anchor="end">'+v+'</text>';
   weeks.forEach((w,i)=>{const x=pl+i*bw+bw*.18;s+='<rect x="'+x+'" y="'+y(w.a)+'" width="'+bw*.64+'" height="'+Math.max(0,y(0)-y(w.a))+'" rx="6" fill="var(--drop)"/>';
     const d=parse(w.ws);s+='<text x="'+(x+bw*.32)+'" y="'+(H-5)+'" text-anchor="middle">'+d.getDate()+'.'+(d.getMonth()+1)+'.</text>'});
-  s+='<line x1="'+pl+'" x2="'+W+'" y1="'+y(base)+'" y2="'+y(base)+'" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4"/><line x1="'+pl+'" x2="'+W+'" y1="'+y(goal)+'" y2="'+y(goal)+'" stroke="var(--sun)" stroke-width="2.5"/>';
+  s+='<line x1="'+pl+'" x2="'+W+'" y1="'+y(base)+'" y2="'+y(base)+'" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4 4"/><line x1="'+pl+'" x2="'+W+'" y1="'+y(goal)+'" y2="'+y(goal)+'" stroke="var(--ink)" stroke-width="2.5"/>';
   return s+'</svg>';
 }
 
@@ -455,28 +473,17 @@ function renderHelp(){
     S.d.subs.forEach(id=>{const s=assistScore(id);if(assistLevel(s)>0)why.push(sub(id).n.toLowerCase()+': testi '+s+' pistettä')});
     if(mixed>0)why.push(mixed+' sekakäyttöpäivää 4 viikossa');}
   const rec=[{h:'Jatka samaan malliin',p:'Tilanteesi näyttää hyvältä. Seuranta auttaa huomaamaan, jos tottumukset alkavat muuttua.'},
-    {h:'Omahoidosta voi olla apua',p:'Moni vähentää omin keinoin, ja tuki helpottaa. Kokeile maksutonta omahoito-ohjelmaa tai ota asia puheeksi työterveydessä tai terveysasemalla.'},
-    {h:'Juttele ammattilaisen kanssa',p:'Tilanteesta kannattaa keskustella ammattilaisen kanssa. Se ei sido sinua hoitoon. Lyhytkin keskustelu auttaa löytämään sopivan tuen.'}][tier];
+    {h:'Tukea on saatavilla',p:'Moni vähentää omin keinoin, ja tuki helpottaa. Voit kysyä neuvoa nimettömästi Päihdelinkin chatissa tai neuvontapalvelussa.'},
+    {h:'Juttele ammattilaisen kanssa',p:'Tilanteesta kannattaa keskustella ammattilaisen kanssa. Se ei sido sinua hoitoon. Päihdelinkin chatissa pääset puhumaan nimettömästi, ja palveluhausta löydät hoitopaikat omalta alueeltasi.'}][tier];
   let h='<h1 style="font-size:1.8rem;margin-top:8px">Apua</h1>';
-  h+='<div class="mascot"><div class="drop" style="width:64px">'+drop('calm')+'</div><div class="bubble" style="margin-bottom:12px"><b>'+rec.h+'</b>'+rec.p+(why.length?'<div class="small muted" style="margin-top:6px">Perusteena '+why.join(', ')+'.</div>':'')+'</div></div>';
+  h+='<div class="mascot"><div class="drop" style="width:64px">'+drop('plain')+'</div><div class="bubble" style="margin-bottom:12px"><b>'+rec.h+'</b>'+rec.p+(why.length?'<div class="small muted" style="margin-top:6px">Perusteena '+why.join(', ')+'.</div>':'')+'</div></div>';
   const T=S.track;
   const groups=[
-    {h:'Juttele nyt',items:[
+    {h:'A-klinikkasäätiön palvelut',items:[
       {t:'Päihdelinkki-chat',d:'Keskustele nimettömästi ammattilaisen kanssa omasta tai läheisen tilanteesta. Ma–ti klo 15–17, ke–to klo 13–15.',u:'https://paihdelinkki.fi/mista-apua/paihdelinkki-chat/'},
-      {t:'Päihdeneuvonta (EHYT ry)',d:'Maksuton ja nimetön puhelin, auki ympäri vuorokauden.',ph:'0800 900 45'},
-      T.drugs&&{t:'Irti huumeista ry',d:'Neuvontaa huumeista ja tukea myös läheisille.',ph:'0800 980 66',u:'https://irtihuumeista.fi/'}]},
-    {h:'Kirjoita ja lue',items:[
       {t:'Päihdelinkin neuvontapalvelu',d:'Kirjoita kysymys milloin vain. Saat henkilökohtaisen vastauksen noin 3–4 päivässä.',u:'https://paihdelinkki.fi/neuvonta/'},
       {t:'Päihdelinkin keskustelufoorumi',d:'Vertaistukea muilta, jotka miettivät samoja asioita.',u:'https://keskustelu.paihdelinkki.fi/'},
-      {t:'Päihdelinkki',d:'Tietoa, testejä ja palveluhaku omalta alueeltasi.',u:'https://paihdelinkki.fi/'},
-      tier>=1&&{t:'Mielenterveystalo',d:'Maksuttomia, anonyymejä omahoito-ohjelmia.',u:'https://www.mielenterveystalo.fi/'}]},
-    {h:'Vertaistuki',items:[
-      T.alcohol&&{t:'AA, Nimettömät Alkoholistit',d:'Vertaistukiryhmiä eri puolilla Suomea.',ph:'09 750 200',u:'https://www.aa.fi/'},
-      T.drugs&&{t:'NA, Nimettömät Narkomaanit',d:'Vertaistukiryhmiä. Auttava puhelin klo 18–20.',ph:'050 370 7597',u:'https://www.nasuomi.org/'},
-      {t:'Al-Anon',d:'Tukea alkoholistien läheisille.',u:'https://www.al-anon.fi/'}]},
-    {h:'Ammattilainen',items:[
-      tier>=1&&{t:'Työterveys tai terveysasema',d:'Päihteiden käytön voi ottaa puheeksi tavallisella vastaanotolla.'},
-      T.drugs&&{t:'Terveysneuvontapisteet',d:'Haittoja vähentävää neuvontaa ja välineitä ilman nimeä. Löydät lähimmän Päihdelinkin palveluhausta.'}]},
+      {t:'Päihdelinkki',d:'Tietoa, testejä ja palveluhaku hoitopaikkoihin omalla alueellasi.',u:'https://paihdelinkki.fi/'}]},
     {h:'Kiireellinen apu',items:[
       T.drugs&&{t:'Myrkytystietokeskus',d:'Neuvoa myrkytyksiin ja yliannostuksiin ympäri vuorokauden.',ph:'0800 147 111'},
       {t:'Päivystysapu',d:'Neuvoa kiireelliseen tilanteeseen, esimerkiksi vieroitusoireisiin.',ph:'116 117'},
@@ -510,8 +517,13 @@ function renderSettings(){
   }
   if(!isStandalone()){h+='<div class="card stack"><h3>Lisää kotinäytölle</h3><p class="small">Tippa toimii kuin sovellus, ja tietosi säilyvät paremmin, kun lisäät sen kotinäytölle.</p>'+(installEvt?'<button class="btn" data-a="install">Lisää kotinäytölle</button>':isIOS()?'<ol class="install-steps small"><li>Napauta Safarin Jaa-painiketta.</li><li>Valitse <b>Lisää Koti-valikkoon</b>.</li></ol>':'<p class="small muted">Avaa selaimen valikko ja valitse <b>Asenna sovellus</b> tai <b>Lisää aloitusnäyttöön</b>.</p>')+'</div>'}
   h+='<div class="card stack"><h3>Tietosi</h3><p class="small">Tippa ei kysy nimeä eikä sähköpostia. Kaikki kirjaukset ovat vain tämän laitteen selaimessa, eikä niitä lähetetä minnekään.</p><p class="small muted">Selain voi poistaa tiedot, jos tyhjennät sen tai palvelu on pitkään käyttämättä (etenkin iPhonella). Ota siis välillä varmuuskopio. Jos joku muu käyttää samaa laitetta, hän voi nähdä kirjauksesi.</p>'+
+    '<button class="btn block" data-a="savebackup">Tallenna varmuuskopio</button>'+
+    '<p class="small muted">Puhelimessa avautuu jakovalikko: valitse esimerkiksi <b>Tallenna Tiedostoihin</b> tai iCloud Drive. Tiedosto sisältää kirjauksesi, joten säilytä se itselläsi.'+(S.lastBackup?' Viimeisin varmuuskopio: '+longDate(S.lastBackup)+'.':'')+'</p>'+
+    '<label class="btn secondary block" for="restore-file" style="display:flex;align-items:center;justify-content:center">Palauta varmuuskopiosta</label><input type="file" id="restore-file" accept=".txt,.json,text/plain,application/json" hidden>'+
+    (ui.restoreMsg?'<p class="small" role="status">'+ui.restoreMsg+'</p>':'')+
+    '<details><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center"><b>Varmuuskopiokoodi</b>&nbsp;(kopioi ja liitä)</summary><div class="stack" style="padding-top:8px">'+
     '<button class="btn secondary" data-a="mkbackup">Luo varmuuskopiokoodi</button>'+(ui.backup?'<textarea id="backup-out" readonly>'+ui.backup+'</textarea><button class="btn ghost" style="align-self:flex-start" data-a="copy">Kopioi koodi</button>':'')+
-    '<label class="small" for="restore-in"><b>Palauta koodista</b></label><textarea id="restore-in" placeholder="Liitä koodi tähän">'+ui.restore+'</textarea><button class="btn secondary" data-a="restore">Palauta</button>'+(ui.restoreMsg?'<p class="small" role="status">'+ui.restoreMsg+'</p>':'')+'</div>';
+    '<label class="small" for="restore-in"><b>Palauta koodista</b></label><textarea id="restore-in" placeholder="Liitä koodi tähän">'+ui.restore+'</textarea><button class="btn secondary" data-a="restore">Palauta</button></div></details></div>';
   if(Object.keys(S.d.log).length)h+='<div class="card stack"><h3>Poista muiden päihteiden kirjaukset</h3>'+(ui.confirmResetD?'<p class="small">Muiden päihteiden kirjaukset ja merkit poistetaan. Alkoholin tiedot säilyvät.</p><div class="row"><button class="btn danger" data-a="resetd">Poista</button><button class="btn secondary" data-a="noresetd">Peru</button></div>':'<button class="btn secondary" data-a="askresetd">Poista muiden päihteiden kirjaukset</button>')+'</div>';
   h+='<div class="card stack"><h3>Aloita alusta</h3>'+(ui.confirmReset?'<p class="small">Kaikki kirjaukset, tavoitteet ja merkit poistetaan tältä laitteelta. Tätä ei voi perua.</p><div class="row"><button class="btn danger" data-a="reset">Poista kaikki</button><button class="btn secondary" data-a="noreset">Peru</button></div>'
     :'<button class="btn secondary" data-a="askreset">Poista kaikki tiedot</button>')+'</div>';
@@ -549,8 +561,8 @@ function render(){
   $('#app').innerHTML=h;
 }
 function badgeToast(list,ids){if(!ids.length)return;const b=list.find(x=>x.id===ids[ids.length-1]);setTimeout(()=>toast('<span class="b">'+b.m+'</span><span>Uusi merkki: '+b.t+'</span>'),500)}
-function afterSave(d){askPersist();ui.feedback=feedbackFor(d);const nb=checkBadges();if(nb.includes('dry30')){preloadReward();ui.reward=true;nb.splice(nb.indexOf('dry30'),1)}badgeToast(BADGES,nb)}
-function afterSaveD(d){askPersist();ui.feedback=feedbackForD(d);badgeToast(DBADGES,checkDBadges())}
+function afterSave(d){askPersist();ui.feedback=feedbackFor(d);const nb=checkBadges();if(nb.length)ui.feedback.milestone=true;if(nb.includes('dry30')){preloadReward();ui.reward=true;nb.splice(nb.indexOf('dry30'),1)}badgeToast(BADGES,nb)}
+function afterSaveD(d){askPersist();ui.feedback=feedbackForD(d);const nb=checkDBadges();if(nb.length)ui.feedback.milestone=true;badgeToast(DBADGES,nb)}
 const toggle=(arr,v)=>{const i=arr.indexOf(v);i<0?arr.push(v):arr.splice(i,1)};
 function finishOnboarding(){const t=today();if(!S._retest){S.goal.start=t;S.d.goal.start=t}S.onboarded=true;ui.tab=S._retest?'help':'today';delete S._retest;fixSide()}
 /* Kaksoisnapautuszoomauksen esto (iOS Safari): toinen nopea napautus ei zoomaa, vaan toimii tavallisena painalluksena */
@@ -565,6 +577,9 @@ document.addEventListener('touchend',e=>{
   lastTap=now;
 },{passive:false});
 document.addEventListener('input',e=>{if(e.target.id==='restore-in')ui.restore=e.target.value});
+document.addEventListener('change',e=>{if(e.target.id!=='restore-file'||!e.target.files||!e.target.files[0])return;
+  e.target.files[0].text().then(t=>{const s=parseBackup(t);if(!s)throw 0;S=s;S.lastBackup=S.lastBackup||today();ui.restoreMsg='Tiedot palautettu varmuuskopiosta.';save();render()})
+  .catch(()=>{ui.restoreMsg='Tiedostoa ei voitu lukea. Valitse Tipasta tallennettu varmuuskopio.';render()})});
 document.addEventListener('click',ev=>{
   const el=ev.target.closest('[data-a]');if(!el)return;const a=el.dataset.a,v=el.dataset.v;
   if(HAPTIC.includes(a))haptic();
@@ -615,9 +630,11 @@ document.addEventListener('click',ev=>{
     case 'sdgtype':S.d.goal.type=v;if(v==='tauko')S.d.goal.start=today();break;
     case 'restart':S.goal.start=today();toast('Uusi jakso alkoi tänään');break;
     case 'drestart':S.d.goal.start=today();toast('Uusi jakso alkoi tänään');break;
+    case 'savebackup':saveBackup();return;
+    case 'snoozebackup':S.backupSnooze=today();break;
     case 'mkbackup':ui.backup=btoa(unescape(encodeURIComponent(JSON.stringify(S))));break;
     case 'copy':{const t=$('#backup-out'),done=()=>toast('Koodi kopioitu');if(navigator.clipboard)navigator.clipboard.writeText(ui.backup).then(done,()=>t.select());else t.select();return}
-    case 'restore':try{const s=migrate(JSON.parse(decodeURIComponent(escape(atob(ui.restore.trim())))));if(!s)throw 0;S=s;ui.restoreMsg='Tiedot palautettu.';ui.restore=''}catch(e){ui.restoreMsg='Koodia ei voitu lukea. Tarkista, että liitit koko koodin.'}break;
+    case 'restore':try{const s=parseBackup(ui.restore);if(!s)throw 0;S=s;ui.restoreMsg='Tiedot palautettu.';ui.restore=''}catch(e){ui.restoreMsg='Koodia ei voitu lukea. Tarkista, että liitit koko koodin.'}break;
     case 'askresetd':ui.confirmResetD=true;break;
     case 'noresetd':ui.confirmResetD=false;break;
     case 'resetd':S.d.log={};S.d.badges={};ui.confirmResetD=false;toast('Muiden päihteiden kirjaukset poistettu');break;

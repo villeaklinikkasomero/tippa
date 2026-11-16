@@ -1,6 +1,6 @@
 /* Tippa service worker: tallentaa sovelluksen tiedostot laitteelle, jotta palvelu aukeaa myös ilman verkkoa.
    Nosta VERSION-numeroa aina, kun julkaiset muutoksia, niin käyttäjät saavat uuden version. */
-const VERSION = 'tippa-v7';
+const VERSION = 'tippa-v9';
 const ASSETS = [
   './',
   'index.html',
@@ -12,13 +12,12 @@ const ASSETS = [
   'icons/icon-512.png',
   'icons/apple-touch-icon.png',
   'palkinnot/30-paivaa-ilman-alkoholia.webp',
-  'fonts/baloo-2-latin-600-normal.woff2',
-  'fonts/baloo-2-latin-700-normal.woff2',
-  'fonts/baloo-2-latin-800-normal.woff2',
-  'fonts/figtree-latin-400-normal.woff2',
-  'fonts/figtree-latin-500-normal.woff2',
-  'fonts/figtree-latin-600-normal.woff2',
-  'fonts/figtree-latin-700-normal.woff2'
+  'brand/lockup-musta.svg',
+  'brand/lockup-valkoinen.svg',
+  'fonts/work-sans-latin-400-normal.woff2',
+  'fonts/work-sans-latin-500-normal.woff2',
+  'fonts/work-sans-latin-600-normal.woff2',
+  'fonts/work-sans-latin-400-italic.woff2',
 ];
 
 self.addEventListener('install', (event) => {
