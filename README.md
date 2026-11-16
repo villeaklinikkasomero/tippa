@@ -4,6 +4,10 @@ Tippa on A-klinikkasäätiön prototyyppi: maksuton ja anonyymi mobiiliverkkopal
 
 Palvelu on staattinen sivusto, eli siinä ei ole palvelinta, tietokantaa eikä build-vaihetta. Kaikki käyttäjän tiedot tallentuvat vain hänen omaan selaimeensa (localStorage).
 
+## Natiivisovellus
+
+Samasta koodista voidaan rakentaa myös iOS- ja Android-sovellus Capacitorilla. Natiiviprojektit pidetään erillään tästä reposta, jotta repo pysyy kevyenä.
+
 ## Rakenne
 
 ```

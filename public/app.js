@@ -86,7 +86,9 @@ function fresh(){return {v:2,onboarded:false,step:0,track:{alcohol:true,drugs:fa
 function migrate(s){if(!s)return null;if(s.v===1){s.v=2;s.track={alcohol:true,drugs:false};s.d=freshD()}return s.v===2&&s.log?s:null}
 function load(){try{const s=migrate(JSON.parse(localStorage.getItem(KEY)));if(s)return s}catch(e){}return fresh()}
 let S=load();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* Natiivisovellus (Capacitor): samat tiedostot, natiivit liitännäiset kun sovellus ajetaan puhelimessa */
+const CAP=window.Capacitor,NATIVE=!!(CAP&&CAP.isNativePlatform&&CAP.isNativePlatform()),NP=NATIVE?CAP.Plugins:{};
+function save(){const j=JSON.stringify(S);try{localStorage.setItem(KEY,j)}catch(e){}if(NATIVE&&NP.Preferences)NP.Preferences.set({key:KEY,value:j}).catch(()=>{})}
 let installEvt=null;
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(S.onboarded&&ui.tab==='settings')render()});
 const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -153,6 +155,9 @@ function backupFile(){return new File([JSON.stringify(S)],'tippa-varmuuskopio-'+
 function fileDownload(f){const u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 function saveBackup(){
   const f=backupFile(),done=()=>{S.lastBackup=today();delete S.backupSnooze;save();render();toast('Varmuuskopio tallennettu')};
+  if(NATIVE&&NP.Filesystem&&NP.Share){NP.Filesystem.writeFile({path:f.name,data:JSON.stringify(S),directory:'CACHE',encoding:'utf8'})
+    .then(r=>NP.Share.share({title:'Tippa: varmuuskopio',files:[r.uri]})).then(done)
+    .catch(e=>{if(!/cancel/i.test(String(e&&e.message||e)))toast('Varmuuskopion tallennus ei onnistunut.')});return}
   if(dlCap){dlCap.save({filename:f.name,data:f}).then(done).catch(e=>{if(!e||e.code!=='declined')toast('Tallennus ei onnistunut tässä näkymässä. Käytä varmuuskopiokoodia.')});return}
   try{if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:'Tippa: varmuuskopio'}).then(done).catch(e=>{if(e&&e.name!=='AbortError'){fileDownload(f);done()}});return}}catch(e){}
   fileDownload(f);done();
@@ -210,7 +215,7 @@ const back=()=>'<button class="btn ghost" data-a="prev">← Takaisin</button>';
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 /* Tuntupalaute: Android käyttää värinää, iPhonen Safari (iOS 18+) antaa kevyen napautuksen piilotetun kytkimen kautta */
 let hapticEl=null;
-function haptic(){try{if(navigator.vibrate){navigator.vibrate(10);return}
+function haptic(){try{if(NATIVE&&NP.Haptics){NP.Haptics.impact({style:'LIGHT'}).catch(()=>{});return}if(navigator.vibrate){navigator.vibrate(10);return}
   if(!hapticEl){const l=document.createElement('label');l.setAttribute('aria-hidden','true');l.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none';const i=document.createElement('input');i.type='checkbox';i.setAttribute('switch','');i.tabIndex=-1;l.appendChild(i);document.body.appendChild(l);hapticEl=l}
   hapticEl.click()}catch(e){}}
 const HAPTIC=['savebackup','savereward','openreward','tab','side','logdry','savedrink','dq','finish','ans','dans','logclean','saveuse','usub','install'];
@@ -251,7 +256,7 @@ function renderOnboarding(){
     h+='<div class="stack-lg center" style="padding-top:20px"><div class="big-drop">'+drop('plain','bob')+'</div>'+
       '<div class="stack center"><h1>Moi, olen Tippa!</h1><p class="muted" style="max-width:32ch">Autan sinua pitämään kirjaa alkoholin ja muiden päihteiden käytöstä. Tauko vai vähentäminen, sinä päätät.</p></div>'+
       '<div class="row" style="justify-content:center;gap:8px"><span class="chip">Maksuton</span><span class="chip">Anonyymi</span><span class="chip">Tiedot vain sinulla</span></div>'+
-      '<div class="stack" style="width:100%"><button class="btn block" data-a="next">Aloitetaan</button><button class="btn secondary block" data-a="demo">Kurkista esimerkkiin</button></div>'+
+      '<div class="stack" style="width:100%"><button class="btn block" data-a="next">Aloitetaan</button><button class="btn secondary block" data-a="demo">Kurkista esimerkkiin</button><button class="btn ghost" data-a="demo30">Kokeile 30. kuivaa päivää</button></div>'+
       '<p class="small muted">Tippa on A-klinikkasäätiön palvelun prototyyppi. Se ei korvaa ammattilaisen arviota.</p></div>';
   }else if(st.k==='choose'){
     const t=S.track,ok=(t.alcohol||t.drugs)&&(!t.drugs||S.d.subs.length);
@@ -344,6 +349,7 @@ function feedbackFor(d){
   return {d,side:'alcohol',mood:'calm',warm:true,h:'Kirjattu',t};
 }
 function backupNudge(){
+  if(NATIVE)return '';
   const n=new Set(Object.keys(S.log).concat(Object.keys(S.d.log))).size;
   if(n<14)return '';
   if(S.lastBackup&&diffDays(S.lastBackup,today())<30)return '';
@@ -515,8 +521,12 @@ function renderSettings(){
     else h+=stepper('dgmax',dg.maxDays,'käyttöpäivää viikossa enintään',1);
     h+='</div><div class="card stack"><h3>Muut päihteet: lähtötaso</h3>'+stepper('dbd',S.d.baseline.days,'käyttöpäivää viikossa',1)+stepper('deur',fmt(S.d.baseline.eur)+' €','per käyttöpäivä',5)+'</div>';
   }
-  if(!isStandalone()){h+='<div class="card stack"><h3>Lisää kotinäytölle</h3><p class="small">Tippa toimii kuin sovellus, ja tietosi säilyvät paremmin, kun lisäät sen kotinäytölle.</p>'+(installEvt?'<button class="btn" data-a="install">Lisää kotinäytölle</button>':isIOS()?'<ol class="install-steps small"><li>Napauta Safarin Jaa-painiketta.</li><li>Valitse <b>Lisää Koti-valikkoon</b>.</li></ol>':'<p class="small muted">Avaa selaimen valikko ja valitse <b>Asenna sovellus</b> tai <b>Lisää aloitusnäyttöön</b>.</p>')+'</div>'}
-  h+='<div class="card stack"><h3>Tietosi</h3><p class="small">Tippa ei kysy nimeä eikä sähköpostia. Kaikki kirjaukset ovat vain tämän laitteen selaimessa, eikä niitä lähetetä minnekään.</p><p class="small muted">Selain voi poistaa tiedot, jos tyhjennät sen tai palvelu on pitkään käyttämättä (etenkin iPhonella). Ota siis välillä varmuuskopio. Jos joku muu käyttää samaa laitetta, hän voi nähdä kirjauksesi.</p>'+
+  if(NATIVE){const r=S.reminder||{on:false,hour:20};
+    h+='<div class="card stack"><h3>Päivittäinen muistutus</h3><div class="tags"><button class="tag'+(r.on?' sel':'')+'" data-a="remind" data-v="on" aria-pressed="'+r.on+'">Päällä</button><button class="tag'+(!r.on?' sel':'')+'" data-a="remind" data-v="off" aria-pressed="'+!r.on+'">Pois</button></div>'+
+      (r.on?'<div class="tags">'+[18,19,20,21,22].map(x=>'<button class="tag'+(r.hour===x?' sel':'')+'" data-a="remindhour" data-v="'+x+'">klo '+x+'</button>').join('')+'</div>':'')+
+      '<p class="small muted">Ilmoituksessa lukee vain “Muista päivän merkintä”, eikä siinä mainita alkoholia tai päihteitä.</p></div>'}
+  if(!isStandalone()&&!NATIVE){h+='<div class="card stack"><h3>Lisää kotinäytölle</h3><p class="small">Tippa toimii kuin sovellus, ja tietosi säilyvät paremmin, kun lisäät sen kotinäytölle.</p>'+(installEvt?'<button class="btn" data-a="install">Lisää kotinäytölle</button>':isIOS()?'<ol class="install-steps small"><li>Napauta Safarin Jaa-painiketta.</li><li>Valitse <b>Lisää Koti-valikkoon</b>.</li></ol>':'<p class="small muted">Avaa selaimen valikko ja valitse <b>Asenna sovellus</b> tai <b>Lisää aloitusnäyttöön</b>.</p>')+'</div>'}
+  h+='<div class="card stack"><h3>Tietosi</h3><p class="small">Tippa ei kysy nimeä eikä sähköpostia. Kaikki kirjaukset ovat vain tämän laitteen selaimessa, eikä niitä lähetetä minnekään.</p><p class="small muted">'+(NATIVE?'Tiedot tallentuvat tähän puhelimeen ja siirtyvät puhelimen omien varmuuskopioiden mukana uuteen puhelimeen. Voit lisäksi tallentaa varmuuskopion tiedostona.':'Selain voi poistaa tiedot, jos tyhjennät sen tai palvelu on pitkään käyttämättä (etenkin iPhonella). Ota siis välillä varmuuskopio.')+' Jos joku muu käyttää samaa laitetta, hän voi nähdä kirjauksesi.</p>'+
     '<button class="btn block" data-a="savebackup">Tallenna varmuuskopio</button>'+
     '<p class="small muted">Puhelimessa avautuu jakovalikko: valitse esimerkiksi <b>Tallenna Tiedostoihin</b> tai iCloud Drive. Tiedosto sisältää kirjauksesi, joten säilytä se itselläsi.'+(S.lastBackup?' Viimeisin varmuuskopio: '+longDate(S.lastBackup)+'.':'')+'</p>'+
     '<label class="btn secondary block" for="restore-file" style="display:flex;align-items:center;justify-content:center">Palauta varmuuskopiosta</label><input type="file" id="restore-file" accept=".txt,.json,text/plain,application/json" hidden>'+
@@ -548,6 +558,12 @@ function loadDemo(){
   checkBadges();checkDBadges();save();ui.tab='today';ui.side='alcohol';ui.day=today();ui.feedback=null;
 }
 
+function loadDemo30(){
+  S=fresh();S.demo=true;S.onboarded=true;S.track={alcohol:true,drugs:false};S.audit={q1:3,q2:1,q3:1};S.sex='nainen';
+  S.baseline={perWeek:12,eur:4};S.goal={type:'tauko',days:30,dryPerWeek:3,maxPerWeek:7,start:addDays(today(),-29)};
+  for(let i=29;i>=1;i--)S.log[addDays(today(),-i)]={dry:true};
+  checkBadges();save();ui.tab='today';ui.side='alcohol';ui.day=today();ui.feedback=null;ui.reward=false;
+}
 /* piirto ja tapahtumat */
 function render(){
   let h;
@@ -587,6 +603,7 @@ document.addEventListener('click',ev=>{
     case 'next':go(1);break;
     case 'prev':go(-1);break;
     case 'demo':loadDemo();break;
+    case 'demo30':loadDemo30();break;
     case 'track':S.track[v]=!S.track[v];break;
     case 'sub':toggle(S.d.subs,v);break;
     case 'ans':S.audit['q'+el.dataset.q]=+v;if(el.dataset.q==='1'&&+v===0){S.audit.q2=0;S.audit.q3=0}go(1);break;
@@ -631,6 +648,8 @@ document.addEventListener('click',ev=>{
     case 'restart':S.goal.start=today();toast('Uusi jakso alkoi tänään');break;
     case 'drestart':S.d.goal.start=today();toast('Uusi jakso alkoi tänään');break;
     case 'savebackup':saveBackup();return;
+    case 'remind':setReminder(v==='on',(S.reminder&&S.reminder.hour)||20);return;
+    case 'remindhour':setReminder(true,+v);return;
     case 'snoozebackup':S.backupSnooze=today();break;
     case 'mkbackup':ui.backup=btoa(unescape(encodeURIComponent(JSON.stringify(S))));break;
     case 'copy':{const t=$('#backup-out'),done=()=>toast('Koodi kopioitu');if(navigator.clipboard)navigator.clipboard.writeText(ui.backup).then(done,()=>t.select());else t.select();return}
@@ -646,6 +665,21 @@ document.addEventListener('click',ev=>{
   if(S._retest&&!S.onboarded){const st=steps()[S.step];if(st&&SETUP_KINDS.includes(st.k))finishOnboarding()}
   save();render();
 });
+function setReminder(on,hour){
+  if(!NATIVE||!NP.LocalNotifications)return;
+  const LN=NP.LocalNotifications,apply=()=>{S.reminder={on,hour};save();render()};
+  LN.cancel({notifications:[{id:1}]}).catch(()=>{}).then(()=>{
+    if(!on){apply();return}
+    return LN.requestPermissions().then(p=>{
+      if(p.display!=='granted'){toast('Salli ilmoitukset puhelimen asetuksista.');S.reminder={on:false,hour};save();render();return}
+      return LN.schedule({notifications:[{id:1,title:'Muistutus',body:'Muista päivän merkintä.',schedule:{on:{hour:hour,minute:0},allowWhileIdle:true}}]}).then(()=>{apply();toast('Muistutus klo '+hour)});
+    });
+  }).catch(()=>toast('Muistutuksen asettaminen ei onnistunut.'));
+}
+if(NATIVE){
+  document.addEventListener('click',e=>{const a=e.target.closest('a[href^="http"]');if(!a||!NP.Browser)return;e.preventDefault();e.stopPropagation();NP.Browser.open({url:a.href}).catch(()=>{})},true);
+  if(NP.Preferences)NP.Preferences.get({key:KEY}).then(r=>{if(r&&r.value){const s=migrate(JSON.parse(r.value));if(s){S=s;render()}}else save()}).catch(()=>{});
+}
 render();
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if(!NATIVE&&'serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 })();

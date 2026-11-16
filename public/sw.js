@@ -1,6 +1,6 @@
 /* Tippa service worker: tallentaa sovelluksen tiedostot laitteelle, jotta palvelu aukeaa myös ilman verkkoa.
    Nosta VERSION-numeroa aina, kun julkaiset muutoksia, niin käyttäjät saavat uuden version. */
-const VERSION = 'tippa-v9';
+const VERSION = 'tippa-v11';
 const ASSETS = [
   './',
   'index.html',
